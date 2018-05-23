@@ -1,6 +1,6 @@
-# Continous Benchmarking
+# Continuous Benchmarking
 
-This repository contains continous benchmarking tools for benchmarking libraries 
+This repository contains continuous benchmarking tools for benchmarking libraries 
 such as google benchmark. The script expects a CSV file of google benchmarks format.
 
 The upload results script will create a gist per branch, upload the newly created data and
