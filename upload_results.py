@@ -165,13 +165,17 @@ def send_graphite(df, benchdate):
     # graphite data is prefixed with {hostname}.{branch}
     print(header_template.format(f"Beginning Upload for: {hostname}.{branch}"))
 
-    g = graphitesend.init(graphite_server=GRAPHITE_SERVER, prefix=f"{hostname}.{branch}", system_name='')
-    for name, row in df.iterrows():
-        idx = name.find('_')
-        if idx:
-            name = list(name); name[idx] = '.'; name = ''.join(name)
-        print("Uploading: {}, {}, timestamp: {}".format(name, row.cpu_time, benchdate.timestamp()))
-        g.send(name, row['cpu_time'], timestamp=benchdate.timestamp())
+    try:
+        g = graphitesend.init(graphite_server=GRAPHITE_SERVER, prefix=f"{hostname}.{branch}", system_name='')
+        for name, row in df.iterrows():
+            idx = name.find('_')
+            if idx:
+                name = list(name); name[idx] = '.'; name = ''.join(name)
+            print("Uploading: {}, {}, timestamp: {}".format(name, row.cpu_time, benchdate.timestamp()))
+            g.send(name, row['cpu_time'], timestamp=benchdate.timestamp())
+    except Exception as e:
+        print("WARNING: Couldn't send data to Graphite!")
+        print(e)
 
 def main():
 
@@ -205,7 +209,7 @@ def main():
 
     master_gist = None
 
-    compare_descr = f'{socket.gethostname()}_master'
+    compare_descr = f'{HOSTNAME}_master'
     for d in all_gists:
         if d['description'].startswith(compare_descr):
             master_gist = d
