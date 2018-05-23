@@ -1,3 +1,28 @@
+#!/usr/bin/env python3
+
+#############################################################################
+# Copyright: 2018 Wolf Vollprecht                                           #
+#                                                                           #
+# Distributed under the terms of the BSD 3-Clause License.                  #
+#                                                                           #
+# The full license is in the file LICENSE, distributed with this software.  #
+#############################################################################
+
+import sys
+
+import_error_msg = "Please create a config.py file containing:\n{}".format(
+    '\n'.join(['GRAPHITE_SERVER', 'GIST_USER', 'GIST_API_TOKEN', 'MAIL_SENDER',
+               'MAIL_RECEIVER', 'SMTP_SERVER', 'SMTP_PASSWORD']))
+
+try:
+    from config import *
+    if GIST_API_TOKEN == '':
+        print("GIST API TOKEN NOT SET!")
+        raise RuntimeError()
+except:
+    print(import_error_msg)
+    sys.exit(1)
+
 import json
 import socket
 import requests
@@ -5,16 +30,17 @@ from datetime import datetime
 from io import StringIO
 
 import pandas as pd
+import numpy as np
 
 import subprocess
 
 # Mail support
-
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import premailer
 
+# Graphite Support
 import graphitesend
 
 ###########
@@ -24,11 +50,6 @@ import graphitesend
 GIST_URL = 'https://api.github.com'
 SMTP_PORT = 587
 
-try:
-    from config import *
-except:
-    print("Please create a config.py file containing:\n{}".format('\n'.join(['GRAPHITE_SERVER', 'GIST_USER', 'GIST_API_TOKEN', 'MAIL_SENDER', 
-                                                                             'MAIL_RECEIVER', 'SMTP_SERVER', 'SMTP_PASSWORD'])))
 ###########
 #
 # -> A simple gist class
@@ -71,13 +92,13 @@ class Gist:
 ###########
 
 header_template = """
-╒════════════════════════════════════════════════════════════════════════════╕
-│░░░░{:^68s}░░░░│
-╘════════════════════════════════════════════════════════════════════════════╛\n
+==============================================================================
+|{:^76s}|
+==============================================================================\n
 """
 
 def get_meta_triplet():
-    hostname = socket.gethostname()
+    hostname = HOSTNAME
     branch = subprocess.check_output(
         ["git", "rev-parse", "--abbrev-ref", "HEAD"]).strip().decode('utf-8')
     commit = subprocess.check_output(
@@ -88,7 +109,7 @@ def get_meta_triplet():
 def get_meta_info(add_meta_data="\n\n\n\n\n"):
 
     hostname, branch, commit = get_meta_triplet()
-        
+
     meta_data = """{header}
     Date:               {date}
     Benchmark Machine:  {hostname}
@@ -190,6 +211,7 @@ def main():
             master_gist = d
             break
 
+
     if master_gist:
         master_gist_id = master_gist['id']
 
@@ -198,6 +220,13 @@ def main():
         last_results = files['bench_results.csv']['content']
 
         df_current_results = pd.read_csv(StringIO(bench_results), index_col=0)
+
+        duplicates = df_current_results.index.duplicated(keep='first')
+        if (np.count_nonzero(duplicates) > 0):
+            print("Warning duplicate benchmarks: ")
+            print('\n'.join(df_current_results.index[duplicates]))
+            df_current_results = df_current_results[~duplicates]
+
         df_last_results = pd.read_csv(StringIO(last_results), index_col=0)
         perc_change = (
             df_current_results[['cpu_time']] - df_last_results[['cpu_time']]
@@ -224,7 +253,7 @@ def main():
 
     if update_gist:
         r = gist.edit(
-            update_gist['id'], 
+            update_gist['id'],
             {'files':
                 {
                     'bench_results.csv': {
@@ -239,7 +268,7 @@ def main():
     else:
         gist.create(
             name='bench_results',
-            description=get_desired_filename(),
+            description=description,
             public=True,
             files={
                 'bench_results.csv': {
@@ -251,8 +280,9 @@ def main():
             }
         )
 
-    print(header_template.format("SENDING TO GRAPHITE"))
-    send_graphite(df_current_results, benchdate)
+    if GRAPHITE_SERVER:
+        print(header_template.format("SENDING TO GRAPHITE"))
+        send_graphite(df_current_results, benchdate)
 
     print(header_template.format("SENDING EMAIL"))
 
@@ -266,7 +296,7 @@ def main():
         html = html.style.applymap(color_negative_red, subset=['difference_master'])
     else:
         html = df_current_results[['iterations', 'real_time', 'cpu_time', 'time_unit']]
-    html = html.set_properties(**{'text-align': 'right'})        
+    html = html.set_properties(**{'text-align': 'right'})
     html = premailer.transform(html.render())
 
     send_mail(MAIL_RECEIVER[0], [],
