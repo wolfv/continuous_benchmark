@@ -296,19 +296,28 @@ def main():
         return 'color: %s' % color
 
     # reindex to remove < and > from html output
-    ix = df_current_results.index
-    ix = [x.replace('<', '[') for x in ix]
-    ix = [x.replace('>', ']') for x in ix]
-    html_frame = df_current_results.reindex(ix)
+    html_frame = df_current_results
+    html_frame = html_frame.rename(lambda x: x.replace('<', '['))
+    html_frame = html_frame.rename(lambda x: x.replace('>', ']'))
 
     if 'difference_master' in list(df_current_results):
         html = html_frame[['iterations', 'real_time', 'cpu_time', 'difference_master', 'time_unit']]
         html = html.style.applymap(color_negative_red, subset=['difference_master'])
+        html = html.set_precision(2)
+        html = html.set_properties(**{'text-align': 'right'})
+        html = premailer.transform(html.render())
+
+        top10 = html_frame.reindex(html_frame.difference_master.abs().sort_values(ascending=False).index)[:10]
+        html_top10 = top10.style.applymap(color_negative_red, subset=['difference_master'])
+        html_top10 = html_top10.set_precision(2)
+        html_top10 = html_top10.set_properties(**{'text-align': 'right'})
+        html_top10 = premailer.transform(html_top10.render())
+
+        html = html_top10 + "<br><br>" + html
     else:
         html = html_frame[['iterations', 'real_time', 'cpu_time', 'time_unit']]
-
-    html = html.set_properties(**{'text-align': 'right'})
-    html = premailer.transform(html.render())
+        html = html.set_properties(**{'text-align': 'right'})
+        html = premailer.transform(html.render())
 
     send_mail(MAIL_RECEIVER[0], [],
         df_current_results[['iterations', 'real_time', 'cpu_time', 'difference_master', 'time_unit']].to_csv(float_format='%.3f'),
