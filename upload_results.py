@@ -119,7 +119,7 @@ def get_meta_info(add_meta_data="\n\n\n\n\n"):
 
 Warnings:\n{meta_data}
     """.format(
-        header=header_template.format(hostname + ", " + branch + ", " + commit[0:10]),
+        header=header_template.format(hostname + ", " + branch + ", " + commit[0:25]),
         hostname=hostname,
         branch=branch,
         commit=commit,
