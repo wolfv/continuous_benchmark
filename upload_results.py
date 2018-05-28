@@ -295,11 +295,18 @@ def main():
         color = 'rgba(255, 0, 0, 1)' if val < 0 else 'rgba(0, 255, 0, 1)'
         return 'color: %s' % color
 
+    # reindex to remove < and > from html output
+    ix = df_current_results.index
+    ix = [x.replace('<', '[') for x in ix]
+    ix = [x.replace('>', ']') for x in ix]
+    html_frame = df_current_results.reindex(ix)
+
     if 'difference_master' in list(df_current_results):
-        html = df_current_results[['iterations', 'real_time', 'cpu_time', 'difference_master', 'time_unit']]
+        html = html_frame[['iterations', 'real_time', 'cpu_time', 'difference_master', 'time_unit']]
         html = html.style.applymap(color_negative_red, subset=['difference_master'])
     else:
-        html = df_current_results[['iterations', 'real_time', 'cpu_time', 'time_unit']]
+        html = html_frame[['iterations', 'real_time', 'cpu_time', 'time_unit']]
+
     html = html.set_properties(**{'text-align': 'right'})
     html = premailer.transform(html.render())
 
